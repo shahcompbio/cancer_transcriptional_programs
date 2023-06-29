@@ -1,0 +1,156 @@
+---
+title: "Spectrum cancer_transcriptional_programs"
+author: "Mobina Kazemi"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    code-fold: true
+    code-tools: true
+    code-link: true
+    toc: true
+execute:
+  cache: false
+---
+
+```{r setup}
+#| output: false
+library(zellkonverter)
+library(Seurat)
+library(cowplot)
+library(tidyverse)
+# library(zellkonverter)
+library(ggthemes)
+library(dittoSeq)
+library(patchwork)
+library(anndata)
+library(Matrix)
+library(glue)
+library(ggplotify)
+library(ggh4x)
+library(here)
+library(leidenbase)
+#library(bsub)
+```
+
+
+```{r}
+list_dir<-list.dirs("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/infer_cnv/objects", recursive = F)
+sce_list_rb <- lapply(X = seq(length(list_dir)), function(i) {
+  readRDS(paste0(list_dir[i],"/",basename(list.dirs("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/infer_cnv/objects", recursive = F)[i]),"_clustered_sce.rds"))
+  
+})
+
+
+# Merge into single object
+sce <- do.call(cbind, sce_list_rb)
+
+saveRDS(sce, file = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/infer_cnv/objects/merged_rds.rds")
+#adata <- zellkonverter::SCE2AnnData(sce)
+#adata_Full$obs<-adata$obs
+```
+
+
+```{r}
+write_h5ad(adata_Full,filename = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/adata_updated_SPECTRUM_NACT.h5ad")
+```
+
+```{r}
+adata_cancer<-adata_Full[which(adata_Full$obs$is_cancer=="True")]
+adata_cancer<-adata_cancer[adata_cancer$obs$cell_type=="Ovarian.cancer.cell"]
+table(adata_cancer$obs$cell_type)
+
+write_h5ad(adata_cancer,filename = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/adata_cancer_cells_SPECTRUM_NACT.h5ad")
+```
+```{r}
+meta_programs<-read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/cancer_metaprograms.csv",sep = ",")
+```
+
+```{python}
+import('pandas', convert = FALSE)
+
+    
+    
+
+
+  
+meta_program_dict = {}
+for m in r.meta_programs.columns:
+    for j in range(49):
+      meta_program_dict.setdefault(m, []).append(r.meta_programs[m].values[j])     
+```
+
+```{python}
+import scanpy as sc
+adata_cancer=sc.read("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/adata_cancer_cells_SPECTRUM_NACT.h5ad")
+
+#counts=pd.DataFrame(adata.X.todense())
+sc.tl.score_genes(adata_cancer,['TOP2A', 'UBE2C', 'HMGB2', 'NUSAP1', 'CENPF', 'CCNB1', 'TPX2', 'CKS2', 'BIRC5', 'PRC1', 'PTTG1', 'KPNA2', 'MKI67', 'CDC20', 'CDK1', 'CCNB2', 'CDKN3', 'SMC4', 'NUF2', 'ARL6IP1', 'CKAP2', 'ASPM', 'PLK1', 'CKS1B', 'CCNA2', 'AURKA', 'MAD2L1', 'GTSE1', 'HMMR', 'UBE2T', 'CENPE', 'CENPA', 'KIF20B', 'AURKB', 'CDCA3', 'CDCA8', 'UBE2S', 'KNSTRN', 'KIF2C', 'PBK', 'TUBA1B', 'DLGAP5', 'TACC3', 'STMN1', 'DEPDC1', 'ECT2', 'CENPW', 'ZWINT', 'HIST1H4C'],score_name="")
+
+for m in r.meta_programs.columns:      
+  sc.tl.score_genes(adata_cancer,meta_program_dict[m],score_name=m)
+  
+  
+adata_cancer.write("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/adata_cancer_meta_SPECTRUM_NACT.h5ad")
+
+data=adata_cancer.obs
+
+adata=sc.read("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/adata_cancer_meta_SPECTRUM_NACT.h5ad")
+
+
+data2=py_to_r(data)
+```
+
+```{r}
+data2=py$data
+
+write.table(data2,file = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/meta_pathway_scores.txt")
+data2=read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/meta_pathway_scores.txt",sep="")
+Data<-data2[,1:11]
+Data$meta_program<-colnames(Data)[11]
+colnames(Data)[11]<-"Score"
+
+
+for(i in 12:51){
+ a<-data2[,c(1:10,i)]
+ a$meta_program<-colnames(a)[11]
+ colnames(a)[11]<-"Score"
+ Data<-rbind(Data,a)
+
+}
+
+Data$site<-0
+
+c("OMENTUM","QUADRANT","PERITONEUM","ASCITES","OVARY","DIAPHRAGM","STOMACH","BOWEL","ADNEXA")
+
+Data$site[grep("BOWEL",Data$sample_id)]<-"BOWEL"
+Data$site[grep("ADNEXA",Data$sample_id)]<-"ADNEXA"
+Data$site[grep("OMENTUM",Data$sample_id)]<-"OMENTUM"
+Data$site[grep("QUADRANT",Data$sample_id)]<-"QUADRANT"
+Data$site[grep("PERITONEUM",Data$sample_id)]<-"PERITONEUM"
+Data$site[grep("ASCITES",Data$sample_id)]<-"ASCITES"
+Data$site[grep("OVARY",Data$sample_id)]<-"OVARY"
+Data$site[grep("DIAPHRAGM",Data$sample_id)]<-"DIAPHRAGM"
+Data$site[grep("STOMACH",Data$sample_id)]<-"STOMACH"
+
+Data2<-Data[which(Data$site %in% c("BOWEL","ADNEXA")),]
+
+library(gg.layers)
+library(ggplot2)
+#facet_wrap( ~ meta_program, scales="free")+ geom_boxplot2(width = 0.8, width.errorbar = 0.5)
+#geom_point(aes(y=Score, group=site), position = position_dodge(width=0.75))
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/meta_program_score_Adnexa_Bowel.pdf",width = 20,height = 5)
+p0=ggplot(Data2, aes(x = meta_program, y = Score)) +  # ggplot function
+  geom_boxplot(aes(fill=site),outlier.shape = NA)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+# scale y limits based on ylim1
+p1 = p0 + scale_y_continuous(limits = quantile(Data2$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(Data2$Score, c(0.1, 0.9)))
+p1
+dev.off()
+
+write.table(Data,"/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/meta_pathway_scores_site_information.csv",sep="\t")
+
+
+
+
+```
+
