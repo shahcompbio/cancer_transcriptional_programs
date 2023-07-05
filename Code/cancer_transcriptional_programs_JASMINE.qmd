@@ -14,8 +14,6 @@ execute:
 
 ```{r setup}
 #| output: false
-library(UCell)
-library(ggplot2)
 library(zellkonverter)
 library(Seurat)
 library(cowplot)
@@ -36,12 +34,104 @@ library(SeuratDisk)
 #library(bsub)
 ```
 
+```{r}
+## libraries and functions required
+
+stringsAsFactors=FALSE
+library(stringr)
+library(GSA)
+
+##################################### STRUCTURE of JASMINE ####################
+### Function1:-  Calculating Mean Ranks for signature genes across each cell
+
+RankCalculation <- function(x,genes){
+			
+            subdata = x[x!=0]                                                                      ### Removing Dropouts from single cell
+			DataRanksUpdated=rank(subdata)                                                         ### Calculating ranks of each signature gene per cell
+			DataRanksSigGenes = DataRanksUpdated[which(names(DataRanksUpdated) %in% genes)]        ### Shortling rank vector for signature genes 
+			CumSum = ifelse(length(DataRanksSigGenes),mean(DataRanksSigGenes,na.rm = TRUE),0 )     ### Calculating Mean of ranks for signature genes
+ 			FinalRawRank = CumSum/length(subdata)                                                  ### Normalizing Means by total coverage
+			return(FinalRawRank)                                                
+			}			
+
+#### Function2:- Calculating enrichment of signature genes across each cell 	(using odds ratio)
+
+ORCalculation <- function(data,genes){
+			GE = data[which(rownames(data) %in% genes),]                                          ### Subsetting data for signature genes
+ 			NGE = data[-which(rownames(data) %in% genes),]                                        ### Subsetting data for non-signature genes
+			SigGenesExp = apply(GE,2,function(x) length(x[x!=0]))                                 ### Calculating Number of expressed Signature Genes per cell
+			NSigGenesExp = apply(NGE,2,function(x) length(x[x!=0]))                               ### Calculating Number of expressed Non-Signature Genes per cell
+			SigGenesNE = nrow(GE) - SigGenesExp                                                   ### Calculating Number of Not expressed Signature Genes per cell
+			SigGenesNE = replace(SigGenesNE,SigGenesNE==0,1)									  ### Replacing Zero's with 1
+			NSigGenesExp = replace(NSigGenesExp,NSigGenesExp==0,1)                                ### Replacing Zero's with 1
+		    NSigGenesNE = nrow(data) - (NSigGenesExp + SigGenesExp)                               ### Calculating Number of Not expressed Non-Signature Genes per cell
+			NSigGenesNE = NSigGenesNE - SigGenesNE
+			OR = (SigGenesExp * NSigGenesNE) / (SigGenesNE * NSigGenesExp)                         ### Calculating Enrichment (Odds Ratio)
+            return(OR)
+			}
+			
+#### Function3:- Calculating enrichment of signature genes across each cell (using Likelihood ratio)
+
+LikelihoodCalculation <- function(data,genes){
+			GE = data[which(rownames(data) %in% genes),]
+			NGE = data[-which(rownames(data) %in% genes),]
+			SigGenesExp = apply(GE,2,function(x) length(x[x!=0]))
+			NSigGenesExp = apply(NGE,2,function(x) length(x[x!=0]))
+			SigGenesNE = nrow(GE) - SigGenesExp
+			SigGenesNE = replace(SigGenesNE,SigGenesNE==0,1)			
+			NSigGenesExp = replace(NSigGenesExp,NSigGenesExp==0,1)
+		    NSigGenesNE = nrow(data) - (NSigGenesExp + SigGenesExp)
+			NSigGenesNE = NSigGenesNE - SigGenesNE
+			LR1 = SigGenesExp*(NSigGenesExp + NSigGenesNE)
+			LR2 = NSigGenesExp * (SigGenesExp + SigGenesNE)
+			LR = LR1/LR2
+            return(LR)
+			}	
+
+###  Function 4:- Scalar [0,1] Normalization of Means and Enrichment across set of cells
+
+NormalizationJAS <- function(JAS_Scores)
+            {
+				JAS_Scores = (JAS_Scores - min(JAS_Scores))/(max(JAS_Scores)- min(JAS_Scores))
+				return(JAS_Scores)
+			}
+
+
+### Function 5:- Signature Scoring via JASMINE mergining Means and Enrichment
+			
+JASMINE <- function(data,genes,method)
+		{
+  		    idx = match(genes,rownames(data))                                                 
+	        idx = idx[!is.na(idx)]
+			if(length(idx)> 1){
+			RM = apply(data,2,function(x) RankCalculation(x,genes))                              ### Mean RankCalculation for single cell data matrix
+			RM = NormalizationJAS(RM)                                                            ### Normalizing Mean Ranks
+			
+			if(method == "oddsratio"){
+			OR = ORCalculation(data,genes)			                                             ### Signature Enrichment Calculation for single cell data matrix (OR)
+			OR = NormalizationJAS(OR)															 ### Normalizing Enrichment Scores (OR)
+			JAS_Scores = (RM + OR)/2
+			}else if(method == "likelihood"){
+			
+			LR = LikelihoodCalculation(data,genes)			                                     ### Signature Enrichment Calculation for single cell data matrix  (LR)
+			LR = NormalizationJAS(LR)															 ### Normalizing Enrichment Scores (LR)
+			JAS_Scores = (RM + LR)/2
+            }
+			FinalScores = data.frame(names(RM),JAS_Scores)                                       ### JASMINE scores
+			colnames(FinalScores)[1]='SampleID'
+			return(FinalScores)
+			}
+		}
+
+```
+
 
 ```{r}
 SCE<-readRDS("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Ovarian.cancer.super_processed_filtered_annotated.rds")
 SCE<-SCE[,which(SCE@meta.data$doublet=="False")]
-#adata<-read_h5ad("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Ovarian_cancer_no_doublet.h5ad")
+data<-SCE$RNA@counts
 ```
+
 
 ```{r}
 meta_programs<-read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/cancer_metaprograms.csv",sep = ",")
@@ -50,7 +140,7 @@ meta_programs<-read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/c
 ```{python}
 import pandas
     
-    
+  
 meta_program_dict = {}
 for m in r.meta_programs.columns:
     for j in range(49):
@@ -61,26 +151,27 @@ for m in r.meta_programs.columns:
 ```{r}
 meta_program_dict_r=py$meta_program_dict
 
-
-scores <- AddModuleScore_UCell(SCE, features=meta_program_dict_r)
-
-
-
-
-
- write.table(scores@meta.data[,c(17,seq(109,149))],file = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores_UCELL.txt")
-
-data2<-scores@meta.data
-
-Data<-data2[,1:109]
-Data$meta_program<-colnames(Data)[109]
-colnames(Data)[109]<-"Score"
+## data = Input data
+### genes = List of gene symbols for which scores have to be calculated
+### method = Enter the method for computing the enrichment. Method could be either 'oddsratio' or 'likelihood'
+for(i in )
+Result  =  JASMINE(data,genes,method =c('oddsratio','likelihood')) ## calling JASMINE 
 
 
-for(i in 110:149){
- a<-data2[,c(1:108,i)]
- a$meta_program<-colnames(a)[109]
- colnames(a)[109]<-"Score"
+ write.table(data2,file = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores_Scanpy.txt")
+# 
+ data2=read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores.txt",sep="")
+
+
+Data<-data2[,1:110]
+Data$meta_program<-colnames(Data)[110]
+colnames(Data)[110]<-"Score"
+
+
+for(i in 111:150){
+ a<-data2[,c(1:109,i)]
+ a$meta_program<-colnames(a)[110]
+ colnames(a)[110]<-"Score"
  Data<-rbind(Data,a)
 
 }
@@ -112,8 +203,11 @@ Data$site[grep("BLADDER",Data$sample)]<-"BLADDER"
 
 Data2<-Data[which(Data$site %in% c("BOWEL","ADNEXA")),]
 
-
-
+#library(gg.layers)
+library(ggplot2)
+#facet_wrap( ~ meta_program, scales="free")+ geom_boxplot2(width = 0.8, width.errorbar = 0.5)
+#geom_point(aes(y=Score, group=site), position = position_dodge(width=0.75))
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/meta_program_score_Adnexa_Bowel.pdf",width = 20,height = 5)
 p0=ggplot(Data2, aes(x = meta_program, y = Score)) +  # ggplot function
   geom_boxplot(aes(fill=site),outlier.shape = NA,position = position_dodge(width = 0.8),width=0.6)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
         axis.title.x = element_blank(),
@@ -123,7 +217,10 @@ p0=ggplot(Data2, aes(x = meta_program, y = Score)) +  # ggplot function
 # scale y limits based on ylim1
 
 p1 = p0 + scale_y_continuous(limits = quantile(Data2$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(Data2$Score, c(0.1, 0.9)))
+p1
+dev.off()
 
+write.table(Data,"/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores.txt",sep="\t")
 
 
 
@@ -139,13 +236,13 @@ stat.test <-compare_means(
 )
 
 p1=p1 + stat_pvalue_manual(
-  stat.test, x = "meta_program", y.position = as.numeric(quantile(Data2$Score, c(0.1, 0.9))[2]),
+  stat.test, x = "meta_program", y.position = 3.596510999,
   label = "p.signif",size = 3.5,color = "red",tip.length = 10,
   bracket.shorten = 10,hide.ns = TRUE)
 p1
 # Box plots
-p1
-pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/UCELL/meta_program_score_Adnexa_Bowel_with_statistics_UCELL.pdf",width = 20,height = 10)
+
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_score_Adnexa_Bowel_with_statistics.pdf",width = 20,height = 10)
 p1 
 dev.off()
 
@@ -179,13 +276,13 @@ stat.test <-compare_means(
 )
 
 p1=p1 + stat_pvalue_manual(
-  stat.test, x = "meta_program", y.position =  as.numeric(quantile(Data2$Score, c(0.1, 0.9))[2]),
+  stat.test, x = "meta_program", y.position = 3.7,
   label = "p.signif",size = 3.5,color = "red",tip.length = 10,
   bracket.shorten = 10,hide.ns = TRUE)
 p1
 # Box plots
 
-pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/UCELL/meta_program_score_Adnexa_OMENTUM_with_statistics_UCELL.pdf",width = 20,height = 10)
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_score_Adnexa_OMENTUM_with_statistics.pdf",width = 20,height = 10)
 p1 
 dev.off()
 ```
@@ -196,7 +293,7 @@ dev.off()
 Data2<-Data[which(Data$site %in% c("BOWEL","ADNEXA")),]
 
 
-pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/UCELL/meta_program_score_Adnexa_BOWEL_patients_UCELL.pdf",width = 20,height = 10)
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_score_Adnexa_BOWEL_patients.pdf",width = 20,height = 10)
 for(i in 1:length(unique((Data2$patient)))){
 patient=as.character((unique((Data2$patient)))[i])
 a<-Data2[which(Data2$patient==patient),]
@@ -233,7 +330,7 @@ dev.off()
 Data2<-Data[which(Data$site %in% c("OMENTUM","ADNEXA")),]
 vec=c()
 
-pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/UCELL/meta_program_score_Adnexa_OMENTUM_patients_UCELL.pdf",width = 20,height = 10)
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_score_Adnexa_OMENTUM_patients.pdf",width = 20,height = 10)
 for(i in 1:length(unique((Data2$patient)))){
 patient=as.character((unique((Data2$patient)))[i])
 a<-Data2[which(Data2$patient==patient),]
@@ -288,7 +385,7 @@ p1 = p0 + scale_y_continuous(limits = quantile(data_median$Score, c(0.1, 0.9)))+
 p1
 
 
-pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/UCELL/meta_program_median_over_samples_Adnexa_BOWEL_UCELL.pdf",width = 20,height = 10)
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_median_over_samples_Adnexa_BOWEL.pdf",width = 20,height = 10)
 p1 
 dev.off()
 
@@ -317,7 +414,7 @@ p1 = p0 + scale_y_continuous(limits = quantile(data_median$Score, c(0.1, 0.9)))+
 p1
 
 
-pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/UCELL/meta_program_median_over_samples_Adnexa_OMENTUM_UCELL.pdf",width = 20,height = 10)
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_median_over_samples_Adnexa_OMENTUM.pdf",width = 20,height = 10)
 p1 
 dev.off()
 ```
