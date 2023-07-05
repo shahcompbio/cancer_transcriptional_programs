@@ -1,0 +1,352 @@
+---
+title: "Spectrum cancer_transcriptional_programs"
+author: "Mobina Kazemi"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    code-fold: true
+    code-tools: true
+    code-link: true
+    toc: true
+execute:
+  cache: false
+---
+
+```{r setup}
+#| output: false
+library(zellkonverter)
+library(Seurat)
+library(cowplot)
+library(tidyverse)
+library(reticulate)
+library(ggthemes)
+library(dittoSeq)
+library(patchwork)
+library(anndata)
+library(Matrix)
+library(glue)
+library(ggplotify)
+library(ggh4x)
+library(here)
+library(leidenbase)
+library(ggpubr)
+library(SeuratDisk)
+#library(bsub)
+```
+
+```{r}
+SCE<-readRDS("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Ovarian.cancer.super_processed_filtered_annotated.rds")
+data.sce <- as.SingleCellExperiment(SCE)
+adata<-SCE2AnnData(data.sce)
+
+```
+
+
+```{r}
+#remove doublet
+adata_original<-adata
+
+adata<-adata[adata$obs$doublet=="False"]
+table(adata$obs$cell_type)
+
+write_h5ad(anndata = adata,filename = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Ovarian_cancer_no_doublet.h5ad")
+```
+
+```{r}
+meta_programs<-read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/cancer_metaprograms.csv",sep = ",")
+```
+
+```{python}
+import pandas
+    
+    
+
+
+  
+meta_program_dict = {}
+for m in r.meta_programs.columns:
+    for j in range(49):
+      meta_program_dict.setdefault(m, []).append(r.meta_programs[m].values[j])     
+```
+
+```{python}
+import scanpy as sc
+adata_cancer=sc.read("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Ovarian_cancer_no_doublet.h5ad")
+
+for m in r.meta_programs.columns:      
+  sc.tl.score_genes(adata_cancer,meta_program_dict[m],score_name=m)
+  
+  
+adata_cancer.write("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Ovarian_cancer_no_doublet_score.h5ad")
+
+data=adata_cancer.obs
+
+adata_cancer.shape
+
+#data2=py_to_r(data)
+```
+
+```{r}
+data2=py$data
+
+ write.table(data2,file = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores_Scanpy.txt")
+# 
+ data2=read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores.txt",sep="")
+
+
+Data<-data2[,1:110]
+Data$meta_program<-colnames(Data)[110]
+colnames(Data)[110]<-"Score"
+
+
+for(i in 111:150){
+ a<-data2[,c(1:109,i)]
+ a$meta_program<-colnames(a)[110]
+ colnames(a)[110]<-"Score"
+ Data<-rbind(Data,a)
+
+}
+
+Data$site<-0
+
+c("OMENTUM","QUADRANT","PERITONEUM","ASCITES","OVARY","DIAPHRAGM","STOMACH","BOWEL","ADNEXA","CECUM","TUBE","TUMOUR","PELVIS","SURFACE","LYMPH_NODE","LYMPH_NODE_WITH_COLONIC_MESENTARY","ANTERIOR_ABDOMINAL_WALL","PARACOLIC_GUTTER","BLADDER")
+
+Data$site[grep("BOWEL",Data$sample)]<-"BOWEL"
+Data$site[grep("ADNEXA",Data$sample)]<-"ADNEXA"
+Data$site[grep("OMENTUM",Data$sample)]<-"OMENTUM"
+Data$site[grep("QUADRANT",Data$sample)]<-"QUADRANT"
+Data$site[grep("PERITONEUM",Data$sample)]<-"PERITONEUM"
+Data$site[grep("ASCITES",Data$sample)]<-"ASCITES"
+Data$site[grep("OVARY",Data$sample)]<-"OVARY"
+Data$site[grep("DIAPHRAGM",Data$sample)]<-"DIAPHRAGM"
+Data$site[grep("STOMACH",Data$sample)]<-"STOMACH"
+Data$site[grep("CECUM",Data$sample)]<-"CECUM"
+Data$site[grep("TUBE",Data$sample)]<-"TUBE"
+Data$site[grep("TUMOUR",Data$sample)]<-"TUMOUR"
+Data$site[grep("PELVIS",Data$sample)]<-"PELVIS"
+Data$site[grep("SURFACE",Data$sample)]<-"SURFACE"
+Data$site[grep("LYMPH_NODE",Data$sample)]<-"LYMPH_NODE"
+Data$site[grep("LYMPH_NODE_WITH_COLONIC_MESENTARY",Data$sample)]<-"LYMPH_NODE_WITH_COLONIC_MESENTARY"
+Data$site[grep("ANTERIOR_ABDOMINAL_WALL",Data$sample)]<-"ANTERIOR_ABDOMINAL_WALL"
+Data$site[grep("PARACOLIC_GUTTER",Data$sample)]<-"PARACOLIC_GUTTER"
+Data$site[grep("BLADDER",Data$sample)]<-"BLADDER"
+
+
+Data2<-Data[which(Data$site %in% c("BOWEL","ADNEXA")),]
+
+#library(gg.layers)
+library(ggplot2)
+#facet_wrap( ~ meta_program, scales="free")+ geom_boxplot2(width = 0.8, width.errorbar = 0.5)
+#geom_point(aes(y=Score, group=site), position = position_dodge(width=0.75))
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/meta_program_score_Adnexa_Bowel.pdf",width = 20,height = 5)
+p0=ggplot(Data2, aes(x = meta_program, y = Score)) +  # ggplot function
+  geom_boxplot(aes(fill=site),outlier.shape = NA,position = position_dodge(width = 0.8),width=0.6)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x = element_blank(),
+        strip.placement = "outside",
+        strip.text.x = element_text(angle=0))
+
+# scale y limits based on ylim1
+
+p1 = p0 + scale_y_continuous(limits = quantile(Data2$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(Data2$Score, c(0.1, 0.9)))
+p1
+dev.off()
+
+write.table(Data,"/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores.txt",sep="\t")
+
+
+
+
+
+
+
+# Box plot: comparison against reference
+
+stat.test <-compare_means(
+  Score ~ site, data = Data2, group.by = "meta_program",
+  method = "t.test", ref.group = "ADNEXA"
+)
+
+p1=p1 + stat_pvalue_manual(
+  stat.test, x = "meta_program", y.position = 3.596510999,
+  label = "p.signif",size = 3.5,color = "red",tip.length = 10,
+  bracket.shorten = 10,hide.ns = TRUE)
+p1
+# Box plots
+
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_score_Adnexa_Bowel_with_statistics.pdf",width = 20,height = 10)
+p1 
+dev.off()
+
+```
+```{r}
+Data2<-Data[which(Data$site %in% c("OMENTUM","ADNEXA")),]
+
+#library(gg.layers)
+library(ggplot2)
+#facet_wrap( ~ meta_program, scales="free")+ geom_boxplot2(width = 0.8, width.errorbar = 0.5)
+#geom_point(aes(y=Score, group=site), position = position_dodge(width=0.75))
+
+p0=ggplot(Data2, aes(x = meta_program, y = Score)) +  # ggplot function
+  geom_boxplot(aes(fill=site),outlier.shape = NA,position = position_dodge(width = 0.8),width=0.6)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x = element_blank(),
+        strip.placement = "outside",
+        strip.text.x = element_text(angle=0))
+
+# scale y limits based on ylim1
+
+p1 = p0 + scale_y_continuous(limits = quantile(Data2$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(Data2$Score, c(0.1, 0.9)))
+
+
+
+
+# Box plot: comparison against reference
+
+stat.test <-compare_means(
+  Score ~ site, data = Data2, group.by = "meta_program",
+  method = "t.test", ref.group = "ADNEXA"
+)
+
+p1=p1 + stat_pvalue_manual(
+  stat.test, x = "meta_program", y.position = 3.7,
+  label = "p.signif",size = 3.5,color = "red",tip.length = 10,
+  bracket.shorten = 10,hide.ns = TRUE)
+p1
+# Box plots
+
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_score_Adnexa_OMENTUM_with_statistics.pdf",width = 20,height = 10)
+p1 
+dev.off()
+```
+
+
+
+```{r}
+Data2<-Data[which(Data$site %in% c("BOWEL","ADNEXA")),]
+
+
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_score_Adnexa_BOWEL_patients.pdf",width = 20,height = 10)
+for(i in 1:length(unique((Data2$patient)))){
+patient=as.character((unique((Data2$patient)))[i])
+a<-Data2[which(Data2$patient==patient),]
+
+p0=ggplot(a, aes(x = meta_program, y = Score)) +  # ggplot function
+  geom_boxplot(aes(fill=site),outlier.shape = NA)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x = element_blank(),
+        strip.placement = "outside",
+        strip.text.x = element_text(angle=0))
+p1 = p0 + scale_y_continuous(limits = quantile(a$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(a$Score, c(0.1, 0.9)))
+
+if(length(table(a$site))==2){
+stat.test <-compare_means(
+  Score ~ site, data = a, group.by = "meta_program",
+  method = "t.test", ref.group = "ADNEXA")
+
+p1=p1 + stat_pvalue_manual(
+  stat.test, x = "meta_program", y.position = as.numeric(quantile(a$Score, c(0.1, 0.9))[2]),
+  label = "p.signif",size = 3.5,color = "red",tip.length = 10,
+  bracket.shorten = 10,hide.ns = TRUE)+ggtitle(paste0("Patient: ",patient))
+print(p1)
+}
+else{
+  p1=p1+ggtitle(paste0("Patient: ",patient))
+  print(p1)
+}
+
+}
+
+dev.off()
+```
+
+```{r}
+Data2<-Data[which(Data$site %in% c("OMENTUM","ADNEXA")),]
+vec=c()
+
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_score_Adnexa_OMENTUM_patients.pdf",width = 20,height = 10)
+for(i in 1:length(unique((Data2$patient)))){
+patient=as.character((unique((Data2$patient)))[i])
+a<-Data2[which(Data2$patient==patient),]
+
+p0=ggplot(a, aes(x = meta_program, y = Score)) +  # ggplot function
+  geom_boxplot(aes(fill=site),outlier.shape = NA)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x = element_blank(),
+        strip.placement = "outside",
+        strip.text.x = element_text(angle=0))
+p1 = p0 + scale_y_continuous(limits = quantile(a$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(a$Score, c(0.1, 0.9)))
+
+if(length(table(a$site))==2 && as.numeric(table(a$site)[2])>50 && as.numeric(table(a$site)[1])>50){
+stat.test <-compare_means(
+  Score ~ site, data = a, group.by = "meta_program",
+  method = "t.test", ref.group = "ADNEXA")
+
+p1=p1 + stat_pvalue_manual(
+  stat.test, x = "meta_program", y.position = as.numeric(quantile(a$Score, c(0.1, 0.9))[2]),
+  label = "p.signif",size = 3.5,color = "red",tip.length = 10,
+  bracket.shorten = 10,hide.ns = TRUE)+ggtitle(paste0("Patient: ",patient))
+print(p1)
+}
+else{
+  p1=p1+ggtitle(paste0("Patient: ",patient))
+  print(p1)
+}
+
+}
+
+dev.off()
+
+```
+
+```{r}
+Data2<-Data[which(Data$site %in% c("BOWEL","ADNEXA")),]
+data_median=Data2 %>% group_by(sample,meta_program) %>% summarise(Score = median(Score, na.rm = TRUE))
+data_median$site<-0
+data_median$site[grep("BOWEL",data_median$sample)]<-"BOWEL"
+data_median$site[grep("ADNEXA",data_median$sample)]<-"ADNEXA"
+
+
+p0=ggplot(data_median, aes(x = meta_program, y = Score)) +  # ggplot function
+  geom_boxplot(aes(fill=site),outlier.shape = NA,position = position_dodge(width = 0.8),width=0.6)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x = element_blank(),
+        strip.placement = "outside",
+        strip.text.x = element_text(angle=0))
+
+# scale y limits based on ylim1
+p0
+p1 = p0 + scale_y_continuous(limits = quantile(data_median$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(data_median$Score, c(0.1, 0.9)))+ggtitle("Score: Median_Score_Over_Samples")
+
+p1
+
+
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_median_over_samples_Adnexa_BOWEL.pdf",width = 20,height = 10)
+p1 
+dev.off()
+
+
+```
+
+
+```{r}
+Data2<-Data[which(Data$site %in% c("OMENTUM","ADNEXA")),]
+data_median=Data2 %>% group_by(sample,meta_program) %>% summarise(Score = median(Score, na.rm = TRUE))
+data_median$site<-0
+data_median$site[grep("OMENTUM",data_median$sample)]<-"OMENTUM"
+data_median$site[grep("ADNEXA",data_median$sample)]<-"ADNEXA"
+
+
+p0=ggplot(data_median, aes(x = meta_program, y = Score)) +  # ggplot function
+  geom_boxplot(aes(fill=site),outlier.shape = NA,position = position_dodge(width = 0.8),width=0.6)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x = element_blank(),
+        strip.placement = "outside",
+        strip.text.x = element_text(angle=0))
+
+# scale y limits based on ylim1
+p0
+p1 = p0 + scale_y_continuous(limits = quantile(data_median$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(data_median$Score, c(0.1, 0.9)))+ggtitle("Score: Median_Score_Over_Samples")
+
+p1
+
+
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_program_median_over_samples_Adnexa_OMENTUM.pdf",width = 20,height = 10)
+p1 
+dev.off()
+```
+
