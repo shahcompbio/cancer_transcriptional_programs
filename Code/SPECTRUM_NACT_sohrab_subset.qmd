@@ -1,5 +1,5 @@
 ---
-title: "Lepto Infer CNV Analysis"
+title: "Spectrum cancer_transcriptional_programs"
 author: "Mobina Kazemi"
 date: "`r Sys.Date()`"
 format: 
@@ -15,6 +15,7 @@ execute:
 ```{r setup}
 #| output: false
 library(zellkonverter)
+library(reticulate)
 library(Seurat)
 library(cowplot)
 library(tidyverse)
@@ -29,6 +30,7 @@ library(ggplotify)
 library(ggh4x)
 library(here)
 library(leidenbase)
+library(ggpubr)
 #library(bsub)
 ```
 
@@ -66,7 +68,7 @@ meta_programs<-read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/c
 ```
 
 ```{python}
-import('pandas', convert = FALSE)
+import pandas
 
     
     
@@ -140,9 +142,13 @@ library(ggplot2)
 #geom_point(aes(y=Score, group=site), position = position_dodge(width=0.75))
 pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/meta_program_score_Adnexa_Bowel.pdf",width = 20,height = 5)
 p0=ggplot(Data2, aes(x = meta_program, y = Score)) +  # ggplot function
-  geom_boxplot(aes(fill=site),outlier.shape = NA)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  geom_boxplot(aes(fill=site),outlier.shape = NA,position = position_dodge(width = 0.8),width=0.6)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x = element_blank(),
+        strip.placement = "outside",
+        strip.text.x = element_text(angle=0))
 
 # scale y limits based on ylim1
+
 p1 = p0 + scale_y_continuous(limits = quantile(Data2$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(Data2$Score, c(0.1, 0.9)))
 p1
 dev.off()
@@ -152,5 +158,149 @@ write.table(Data,"/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/meta_pathw
 
 
 
+
+
+
+# Box plot: comparison against reference
+
+stat.test <-compare_means(
+  Score ~ site, data = Data2, group.by = "meta_program",
+  method = "t.test", ref.group = "ADNEXA"
+)
+
+p1=p1 + stat_pvalue_manual(
+  stat.test, x = "meta_program", y.position = 3.1389,
+  label = "p.signif",size = 3.5,color = "red",tip.length = 10,
+  bracket.shorten = 10,hide.ns = TRUE)
+
+# Box plots
+
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/meta_program_score_Adnexa_Bowel_with_statistics.pdf",width = 20,height = 10)
+p1 
+dev.off()
+```
+
+
+```{r}
+Data2<-Data[which(Data$site %in% c("BOWEL","ADNEXA")),]
+
+library(gg.layers)
+library(ggplot2)
+#facet_wrap( ~ meta_program, scales="free")+ geom_boxplot2(width = 0.8, width.errorbar = 0.5)
+#geom_point(aes(y=Score, group=site), position = position_dodge(width=0.75))
+
+p0=ggplot(Data, aes(x = meta_program, y = Score)) +  # ggplot function
+  geom_boxplot(aes(fill=site),outlier.shape = NA)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x = element_blank(),
+        strip.placement = "outside",
+        strip.text.x = element_text(angle=0))
+
+# scale y limits based on ylim1
+
+p1 = p0 + scale_y_continuous(limits = quantile(Data$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(Data$Score, c(0.1, 0.9)))
+p1
+
+
+
+
+
+
+# Box plot: comparison against reference
+
+stat.test <-compare_means(
+  Score ~ site, data = Data, group.by = "meta_program",
+  method = "anova", ref.group = "ADNEXA"
+)
+
+p1=p1 + stat_pvalue_manual(
+  stat.test, x = "meta_program", y.position = 3.1389,
+  label = "p.signif",size = 3.5,color = "red",tip.length = 10,
+  bracket.shorten = 10,hide.ns = TRUE)
+
+
+p1
+# Box plots
+
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/meta_program_score_overall.pdf",width = 20,height = 5)
+p1 
+dev.off()
+```
+
+```{r}
+Data2<-Data[which(Data$site %in% c("BOWEL","ADNEXA")),]
+
+library(gg.layers)
+library(ggplot2)
+#facet_wrap( ~ meta_program, scales="free")+ geom_boxplot2(width = 0.8, width.errorbar = 0.5)
+#geom_point(aes(y=Score, group=site), position = position_dodge(width=0.75))
+
+p0=ggplot(Data2, aes(x = meta_program, y = Score)) +  # ggplot function
+  geom_boxplot(aes(fill=site),outlier.shape = NA)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x = element_blank(),
+        strip.placement = "outside",
+        strip.text.x = element_text(angle=0))
+
+# scale y limits based on ylim1
+
+p1 = p0 + scale_y_continuous(limits = quantile(Data2$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(Data2$Score, c(0.1, 0.9)))+facet_wrap( ~ patient)
+p1
+
+
+
+for(i in length(unique((Data2$patient)))){
+a<-Data2[which(Data2$patient==Data2$patient[i]),]
+
+p0=ggplot(a, aes(x = meta_program, y = Score)) +  # ggplot function
+  geom_boxplot(aes(fill=site),outlier.shape = NA)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x = element_blank(),
+        strip.placement = "outside",
+        strip.text.x = element_text(angle=0))
+p1 = p0 + scale_y_continuous(limits = quantile(Data2$Score, c(0.1, 0.9)))+coord_cartesian(ylim = quantile(Data2$Score, c(0.1, 0.9)))
+
+stat.test <-compare_means(
+  Score ~ site, data = a, group.by = "meta_program",
+  method = "t.test", ref.group = "ADNEXA")
+
+p1=p1 + stat_pvalue_manual(
+  stat.test, x = "meta_program", y.position = 3.1389,
+  label = "p.signif",size = 3.5,color = "red",tip.length = 10,
+  bracket.shorten = 10,hide.ns = TRUE)
+
+
+  
+  
+  
+)
+
+p1=p1 + stat_pvalue_manual(
+  stat.test, x = "meta_program", y.position = 3.1389,
+  label = "p.signif",size = 3.5,color = "red",tip.length = 10,
+  bracket.shorten = 10,hide.ns = TRUE)
+
+
+}
+
+stat.test <- Data2 %>%
+  group_by(patient, meta_program) %>%
+  compare_means(
+  Score ~ site,
+  method = "t.test", ref.group = "ADNEXA"
+)
+stat.test 
+
+
+
+
+p1=p1 + stat_pvalue_manual(
+  stat.test, x = "meta_program", y.position = 3.1389,
+  label = "p.adj.signif",size = 3.5,color = "red",hide.ns = TRUE)
+
+
+p1
+# Box plots
+
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/data/meta_program_score_Adnexa_Bowel_patient.pdf",width = 20,height = 5)
+p1 
+dev.off()
 ```
 
