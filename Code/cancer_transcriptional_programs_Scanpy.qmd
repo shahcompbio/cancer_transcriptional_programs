@@ -88,12 +88,13 @@ adata_cancer.shape
 
 ```{r}
 data2=py$data
+write.table(data2,file = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Data2_meta_pathway_scores_Scanpy.txt")
 
  write.table(data2,file = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores_Scanpy.txt")
 # 
- data2=read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores.txt",sep="")
+ data2=read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores_Scanpy.txt",sep="")
 
-
+data2<-Scanpy
 Data<-data2[,1:110]
 Data$meta_program<-colnames(Data)[110]
 colnames(Data)[110]<-"Score"
@@ -130,6 +131,7 @@ Data$site[grep("LYMPH_NODE_WITH_COLONIC_MESENTARY",Data$sample)]<-"LYMPH_NODE_WI
 Data$site[grep("ANTERIOR_ABDOMINAL_WALL",Data$sample)]<-"ANTERIOR_ABDOMINAL_WALL"
 Data$site[grep("PARACOLIC_GUTTER",Data$sample)]<-"PARACOLIC_GUTTER"
 Data$site[grep("BLADDER",Data$sample)]<-"BLADDER"
+
 
 
 Data2<-Data[which(Data$site %in% c("BOWEL","ADNEXA")),]

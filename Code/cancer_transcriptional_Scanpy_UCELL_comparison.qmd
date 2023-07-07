@@ -1,0 +1,194 @@
+---
+title: "Spectrum cancer_transcriptional_programs"
+author: "Mobina Kazemi"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    code-fold: true
+    code-tools: true
+    code-link: true
+    toc: true
+execute:
+  cache: false
+---
+
+```{r setup}
+#| output: false
+library(zellkonverter)
+library(Seurat)
+library(cowplot)
+library(tidyverse)
+library(reticulate)
+library(ggthemes)
+library(dittoSeq)
+library(patchwork)
+library(anndata)
+library(Matrix)
+library(glue)
+library(ggplotify)
+library(ggh4x)
+library(here)
+library(leidenbase)
+library(ggpubr)
+library(SeuratDisk)
+library(ggpubr)
+#library(bsub)
+```
+
+```{r}
+U_cell<-read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Data2_meta_pathway_scores_UCELL.txt",sep="")
+Scanpy<-read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Data2_meta_pathway_scores_Scanpy.txt",sep="")
+
+Scanpy<-Data
+U_cell<-Data
+
+
+
+
+Data_scanpy<-Scanpy[,c(17,110,111,112)]
+Data_Ucell<-U_cell[,c(17,109,110,111)]
+saveRDS(Data_scanpy, file="/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Data_scanpy.rds")
+saveRDS(Data_Ucell, file="/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Data_Ucell.rds")
+
+Data_scanpy<-readRDS("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Data_scanpy.rds")
+Data_Ucell<-readRDS("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Data_Ucell.rds")
+
+
+colnames(Data_scanpy)[2:4]<-paste0("scanpy_",colnames(Data_scanpy)[2:4])
+colnames(Data_Ucell)[2:4]<-paste0("Ucell_",colnames(Data_Ucell)[2:4])
+
+
+Data<-cbind(Data_scanpy,Data_Ucell[,c(2:4)]
+
+saveRDS(Data, file="/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Data.rds")
+
+Data2<-Data[which(Data$scanpy_site %in% c("BOWEL","ADNEXA")),]
+
+#quantiles to remove outliers
+Data3<-Data2 %>% filter(quantile(Data2$scanpy_Score, c(0.1))<scanpy_Score) %>% filter(scanpy_Score<quantile(Data2$scanpy_Score, c(0.9)))
+#Data3<-Data3 %>% filter(quantile(Data3$Ucell_Score, c(0.1))<Ucell_Score) %>% filter(Ucell_Score<quantile(Data3$Ucell_Score, c(0.9)))
+
+
+
+
+ggscatter(Data3, x = "scanpy_Score", y = "Ucell_Score",
+   color = "black", shape = 21, size = 3, # Points color, shape and size
+   add = "reg.line",  # Add regressin line
+   add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+   conf.int = TRUE, # Add confidence interval
+   cor.coef = TRUE, # Add correlation coefficient. see ?stat_cor
+   cor.coeff.args = list(method = "pearson", label.x = 3, label.sep = "\n")
+   )
+
+p0=ggplot(Data3, aes(x=scanpy_Score, y=Ucell_Score)) + geom_point() + ggtitle("scanpy_Score vs Ucell_Score") + geom_smooth(method=lm, se=FALSE)  + theme(plot.title = element_text(hjust = 0.5), panel.background = element_blank(), axis.line = element_line(color="black"), axis.line.x = element_line(color="black")) + theme_bw()
+
+p0=p0 + stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)
+p0
+```
+
+
+```{r}
+Data4<-Data3 %>% group_by(Ucell_meta_program,Ucell_site) %>% summarise(Ucell_Score_median = median(Ucell_Score, na.rm = TRUE),scanpy_Score_median = median(scanpy_Score, na.rm = TRUE))
+Data4_Adnexa<-Data4[which(Data4$Ucell_site=="ADNEXA"),]
+Data4_Bowel<- Data4[which(Data4$Ucell_site=="BOWEL"),]
+
+colnames(Data4_Adnexa)[3:4]<-paste0("Adnexa_",colnames(Data4_Adnexa)[3:4])
+colnames(Data4_Bowel)[3:4]<-paste0("BOWEL_",colnames(Data4_Bowel)[3:4])
+
+Data_Adnexa_BOWEL<-cbind(Data4_Adnexa,Data4_Bowel[,3:4])
+Data_Adnexa_BOWEL<-Data_Adnexa_BOWEL[,-2]
+
+Data_Adnexa_BOWEL$Ucell_Score_median_Adnexa_vs_BOWEL <-Data_Adnexa_BOWEL$Adnexa_Ucell_Score_median-Data_Adnexa_BOWEL$BOWEL_Ucell_Score_median
+Data_Adnexa_BOWEL$Scanpy_Score_median_Adnexa_vs_BOWEL <- Data_Adnexa_BOWEL$Adnexa_scanpy_Score_median-Data_Adnexa_BOWEL$BOWEL_scanpy_Score_median
+```
+
+
+```{r}
+p1=ggplot(Data_Adnexa_BOWEL, aes(x=Adnexa_Ucell_Score_median, y=Adnexa_scanpy_Score_median)) + geom_point() + ggtitle("scanpy_Score vs Ucell_Score") + geom_smooth(method=lm, se=FALSE)  + theme(plot.title = element_text(hjust = 0.5), panel.background = element_blank(), axis.line = element_line(color="black"), axis.line.x = element_line(color="black")) + theme_bw()
+
+p1=p1 + stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)
+p1
+
+p2=ggplot(Data_Adnexa_BOWEL, aes(x=BOWEL_Ucell_Score_median, y=BOWEL_scanpy_Score_median)) + geom_point() + ggtitle("scanpy_Score vs Ucell_Score") + geom_smooth(method=lm, se=FALSE)  + theme(plot.title = element_text(hjust = 0.5), panel.background = element_blank(), axis.line = element_line(color="black"), axis.line.x = element_line(color="black")) + theme_bw()
+
+p2=p2 + stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)
+p2
+
+p3=ggplot(Data_Adnexa_BOWEL, aes(x=Ucell_Score_median_Adnexa_vs_BOWEL, y=Scanpy_Score_median_Adnexa_vs_BOWEL)) + geom_point() + ggtitle("scanpy_Score vs Ucell_Score") + geom_smooth(method=lm, se=FALSE)  + theme(plot.title = element_text(hjust = 0.5), panel.background = element_blank(), axis.line = element_line(color="black"), axis.line.x = element_line(color="black")) + theme_bw()
+
+p3=p3 + stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)
+p3
+```
+```{r}
+Data_Adnexa_BOWEL$meta_program<-gsub(pattern = "_UCell",replacement = "",Data_Adnexa_BOWEL$Ucell_meta_program)
+
+for(i in 2:7){
+  a<-rank(Data_Adnexa_BOWEL[,i])
+  a<-as.data.frame(a)
+  colnames(a)<-paste0(colnames(Data_Adnexa_BOWEL)[i],"_rank")
+  Data_Adnexa_BOWEL<-cbind(Data_Adnexa_BOWEL,a)
+  
+}
+
+a<-Data_Adnexa_BOWEL[,c(9,8)]
+a$method<-"UCELL"
+colnames(a)[1]<-"Score"
+
+b<-Data_Adnexa_BOWEL[,c(10,8)]
+b$method<-"Scanpy"
+colnames(b)[1]<-"Score"
+
+c<-rbind(a,b)
+
+p4=ggplot(c, aes(x=fct_reorder(meta_program, Score, median), y=Score,fill=method)) +
+  geom_bar(position="dodge", stat="identity")+ theme(axis.text.x = element_text(angle = 90))+ ggtitle("Adnexa_Score_median")+xlab("meta_programs") +ylab("Rank") 
+
+p4
+```
+```{r}
+a<-Data_Adnexa_BOWEL[,c(11,8)]
+a$method<-"UCELL"
+colnames(a)[1]<-"Score"
+
+b<-Data_Adnexa_BOWEL[,c(12,8)]
+b$method<-"Scanpy"
+colnames(b)[1]<-"Score"
+
+c<-rbind(a,b)
+
+p5=ggplot(c, aes(x=fct_reorder(meta_program, Score, median), y=Score,fill=method)) +
+  geom_bar(position="dodge", stat="identity")+ theme(axis.text.x = element_text(angle = 90))+ ggtitle("Bowel_Score_median")+xlab("meta_programs") +ylab("Rank") 
+
+p5
+```
+```{r}
+a<-Data_Adnexa_BOWEL[,c(13,8)]
+a$method<-"UCELL"
+colnames(a)[1]<-"Score"
+
+b<-Data_Adnexa_BOWEL[,c(14,8)]
+b$method<-"Scanpy"
+colnames(b)[1]<-"Score"
+
+c<-rbind(a,b)
+
+p6=ggplot(c, aes(x=fct_reorder(meta_program, Score, median), y=Score,fill=method)) +
+  geom_bar(position="dodge", stat="identity")+ theme(axis.text.x = element_text(angle = 90))+ ggtitle("ADNEXA_vs_BOWEL_Score_median")+xlab("meta_programs") +ylab("Rank") 
+
+p6
+```
+```{r}
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/comparison_UCELL_Scanpy.pdf")
+p0
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+
+
+write.table(Data_Adnexa_BOWEL,"/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Data_Adnexa_BOWEL.txt")
+```
+

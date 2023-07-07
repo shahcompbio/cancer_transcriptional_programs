@@ -31,6 +31,8 @@ library(here)
 library(leidenbase)
 library(ggpubr)
 library(SeuratDisk)
+library(stringr)
+library(GSA)
 #library(bsub)
 ```
 
@@ -38,8 +40,7 @@ library(SeuratDisk)
 ## libraries and functions required
 
 stringsAsFactors=FALSE
-library(stringr)
-library(GSA)
+
 
 ##################################### STRUCTURE of JASMINE ####################
 ### Function1:-  Calculating Mean Ranks for signature genes across each cell
@@ -129,6 +130,7 @@ JASMINE <- function(data,genes,method)
 ```{r}
 SCE<-readRDS("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Ovarian.cancer.super_processed_filtered_annotated.rds")
 SCE<-SCE[,which(SCE@meta.data$doublet=="False")]
+data2<-SCE@meta.data
 data<-SCE$RNA@counts
 ```
 
@@ -150,14 +152,21 @@ for m in r.meta_programs.columns:
 
 ```{r}
 meta_program_dict_r=py$meta_program_dict
-
+#Input Data:- 
+####                 1. A single cell RNAseq data matrix, where rows correspond to gene symbols and columns correspond to cells
+####                 2. A vector of marker genes(symbols) reflecting a biological process for scoring
 ## data = Input data
 ### genes = List of gene symbols for which scores have to be calculated
 ### method = Enter the method for computing the enrichment. Method could be either 'oddsratio' or 'likelihood'
-for(i in )
-Result  =  JASMINE(data,genes,method =c('oddsratio','likelihood')) ## calling JASMINE 
+for(i in names(meta_program_dict_r)){
+genes<- meta_program_dict_r[[i]]
+#'oddsratio',
+Result  =  JASMINE(data,genes,method =c('likelihood')) ## calling JASMINE 
+colnames(Result)[2]<-i
+colnames(Result)[1]<-"cell_id"
+data2<-merge(data2,Result,by = "cell_id")
 
-
+}
  write.table(data2,file = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores_Scanpy.txt")
 # 
  data2=read.delim("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores.txt",sep="")
