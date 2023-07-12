@@ -64,11 +64,82 @@ meta_program_dict_r=py$meta_program_dict
 
 scores <- AddModuleScore_UCell(SCE, features=meta_program_dict_r)
 
+scores@meta.data$site<-0
+scores@meta.data$site[grep("BOWEL",scores@meta.data$sample)]<-"BOWEL"
+scores@meta.data$site[grep("ADNEXA",scores@meta.data$sample)]<-"ADNEXA"
+scores@meta.data$site[grep("OMENTUM",scores@meta.data$sample)]<-"OMENTUM"
+scores@meta.data$site[grep("QUADRANT",scores@meta.data$sample)]<-"QUADRANT"
+scores@meta.data$site[grep("PERITONEUM",scores@meta.data$sample)]<-"PERITONEUM"
+scores@meta.data$site[grep("ASCITES",scores@meta.data$sample)]<-"ASCITES"
+scores@meta.data$site[grep("OVARY",scores@meta.data$sample)]<-"OVARY"
+scores@meta.data$site[grep("DIAPHRAGM",scores@meta.data$sample)]<-"DIAPHRAGM"
+scores@meta.data$site[grep("STOMACH",scores@meta.data$sample)]<-"STOMACH"
+scores@meta.data$site[grep("CECUM",scores@meta.data$sample)]<-"CECUM"
+scores@meta.data$site[grep("TUBE",scores@meta.data$sample)]<-"TUBE"
+scores@meta.data$site[grep("TUMOUR",scores@meta.data$sample)]<-"TUMOUR"
+scores@meta.data$site[grep("PELVIS",scores@meta.data$sample)]<-"PELVIS"
+scores@meta.data$site[grep("SURFACE",scores@meta.data$sample)]<-"SURFACE"
+scores@meta.data$site[grep("LYMPH_NODE",scores@meta.data$sample)]<-"LYMPH_NODE"
+scores@meta.data$site[grep("LYMPH_NODE_WITH_COLONIC_MESENTARY",scores@meta.data$sample)]<-"LYMPH_NODE_WITH_COLONIC_MESENTARY"
+scores@meta.data$site[grep("ANTERIOR_ABDOMINAL_WALL",scores@meta.data$sample)]<-"ANTERIOR_ABDOMINAL_WALL"
+scores@meta.data$site[grep("PARACOLIC_GUTTER",scores@meta.data$sample)]<-"PARACOLIC_GUTTER"
+scores@meta.data$site[grep("BLADDER",scores@meta.data$sample)]<-"BLADDER"
+
+scores@meta.data$patient<-scores@meta.data$patient_id
+
+data.sce <- as.SingleCellExperiment(scores)
+adata<-SCE2AnnData(data.sce)
+adata$obs["patient"]
+write_h5ad(adata,"/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/UCELL_scores_seurat.h5ad")
+
+class(scores@meta.data$patient)
+scores@meta.data$patient<-as.factor(scores@meta.data$patient)
+scores@meta.data$patient_id<-as.factor(scores@meta.data$patient_id)
+SaveH5Seurat(scores, filename = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/UCELL_scores_seurat.h5Seurat")
+#Convert("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/UCELL_scores_seurat.h5Seurat", dest = "h5ad")
+
+1+1
+```
+
+```{python}
+import scanpy as sc
+adata=sc.read("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/UCELL_scores_seurat.h5ad")
+
+adata_full=r.adata
+
+adata.obs
+meta_programs_list=["MP1..Cell.Cycle...G2.M_UCell", "MP2..Cell.Cycle...G1.S_UCell"]
+
+,
+       'MP3..Cell.Cylce.HMG.rich_UCell', 'MP4..Chromatin_UCell',
+       'MP5.Stress_UCell', 'MP6.Hypoxia_UCell', 'MP7.Stress..in.vitro._UCell',
+       'MP8.Proteasomal.degradation_UCell',
+       'MP9.Unfolded.protein.response_UCell', 'MP10.Protein.maturation_UCell',
+       'MP11.Translation.initiation_UCell', 'MP12.EMT.I_UCell',
+       'MP13.EMT.II_UCell', 'MP14.EMT.III_UCell', 'MP15.EMT.IV_UCell',
+       'MP16.MES..glioma._UCell', 'MP17.Interferon.MHC.II..I._UCell',
+       'MP18.Interferon.MHC.II..II._UCell', 'MP19.Epithelial.Senescence_UCell',
+       'MP20.MYC_UCell', 'MP21.Respiration_UCell', 'MP22.Secreted.I_UCell',
+       'MP23.Secreted.II_UCell', 'MP24.Cilia_UCell', 'MP25.Astrocytes_UCell',
+       'MP26.NPC.Glioma_UCell', 'MP27.Oligo.Progenitor_UCell',
+       'MP28.Oligo.normal_UCell', 'MP29.NPC.OPC_UCell',
+       'MP30.PDAC.classical_UCell', 'MP31.Alveolar_UCell',
+       'MP32.Skin.pigmentation_UCell', 'MP33.RBCs_UCell',
+       'MP34.Platelet.activation_UCell', 'MP35.Hemato.related.I_UCell',
+       'MP36.IG_UCell', 'MP37.Hemato.related.II_UCell',
+       'MP38.Glutathione_UCell', 'MP39.Metal.response_UCell',
+       'MP40.PDAC.related_UCell', 'MP41.Unassigned_UCell']
+       
+       
+       
+sc.tl.dendrogram(adata, groupby='patient')       
+sc.pl.matrixplot(adata, meta_programs_list, groupby='patient_id', dendrogram=True)
 
 
+```
 
-
- write.table(scores@meta.data[,c(17,seq(109,149))],file = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores_UCELL.txt")
+```{r}
+write.table(scores@meta.data[,c(17,seq(109,149))],file = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/meta_pathway_scores_UCELL.txt")
 
 data2<-scores@meta.data
 write.table(data2,file = "/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Data2_meta_pathway_scores_UCELL.txt")
@@ -153,6 +224,7 @@ p1
 dev.off()
 
 ```
+
 ```{r}
 Data2<-Data[which(Data$site %in% c("OMENTUM","ADNEXA")),]
 

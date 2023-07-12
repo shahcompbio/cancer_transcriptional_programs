@@ -80,7 +80,7 @@ ggscatter(Data3, x = "scanpy_Score", y = "Ucell_Score",
    cor.coeff.args = list(method = "pearson", label.x = 3, label.sep = "\n")
    )
 
-p0=ggplot(Data3, aes(x=scanpy_Score, y=Ucell_Score)) + geom_point() + ggtitle("scanpy_Score vs Ucell_Score") + geom_smooth(method=lm, se=FALSE)  + theme(plot.title = element_text(hjust = 0.5), panel.background = element_blank(), axis.line = element_line(color="black"), axis.line.x = element_line(color="black")) + theme_bw()
+p0=ggplot(Data3, aes(x=scanpy_Score, y=Ucell_Score)) + geom_point(size=0.001) + ggtitle("scanpy_Score vs Ucell_Score") + geom_smooth(method=lm, se=FALSE)  + theme(plot.title = element_text(hjust = 0.5), panel.background = element_blank(), axis.line = element_line(color="black"), axis.line.x = element_line(color="black")) + theme_bw()
 
 p0=p0 + stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)
 p0
@@ -106,12 +106,14 @@ Data_Adnexa_BOWEL$Scanpy_Score_median_Adnexa_vs_BOWEL <- Data_Adnexa_BOWEL$Adnex
 ```{r}
 p1=ggplot(Data_Adnexa_BOWEL, aes(x=Adnexa_Ucell_Score_median, y=Adnexa_scanpy_Score_median)) + geom_point() + ggtitle("scanpy_Score vs Ucell_Score") + geom_smooth(method=lm, se=FALSE)  + theme(plot.title = element_text(hjust = 0.5), panel.background = element_blank(), axis.line = element_line(color="black"), axis.line.x = element_line(color="black")) + theme_bw()
 
-p1=p1 + stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)
+p1=p1 + stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)+geom_text(data=subset(Data_Adnexa_BOWEL, Adnexa_Ucell_Score_median > 0.2 | Adnexa_scanpy_Score_median > 1.25),
+            aes(Adnexa_Ucell_Score_median,Adnexa_scanpy_Score_median,label=meta_program),size=2.5)
 p1
 
 p2=ggplot(Data_Adnexa_BOWEL, aes(x=BOWEL_Ucell_Score_median, y=BOWEL_scanpy_Score_median)) + geom_point() + ggtitle("scanpy_Score vs Ucell_Score") + geom_smooth(method=lm, se=FALSE)  + theme(plot.title = element_text(hjust = 0.5), panel.background = element_blank(), axis.line = element_line(color="black"), axis.line.x = element_line(color="black")) + theme_bw()
 
-p2=p2 + stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)
+p2=p2 + stat_cor(p.accuracy = 0.001, r.accuracy = 0.01)+geom_text(data=subset(Data_Adnexa_BOWEL, Adnexa_Ucell_Score_median > 0.2 | Adnexa_scanpy_Score_median > 1.25),
+            aes(Adnexa_Ucell_Score_median,Adnexa_scanpy_Score_median,label=meta_program),size=2.5)
 p2
 
 p3=ggplot(Data_Adnexa_BOWEL, aes(x=Ucell_Score_median_Adnexa_vs_BOWEL, y=Scanpy_Score_median_Adnexa_vs_BOWEL)) + geom_point() + ggtitle("scanpy_Score vs Ucell_Score") + geom_smooth(method=lm, se=FALSE)  + theme(plot.title = element_text(hjust = 0.5), panel.background = element_blank(), axis.line = element_line(color="black"), axis.line.x = element_line(color="black")) + theme_bw()
@@ -188,7 +190,52 @@ p5
 p6
 dev.off()
 
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/comparison_UCELL_Scanpy_median.pdf")
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
 
 write.table(Data_Adnexa_BOWEL,"/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/Data_Adnexa_BOWEL.txt")
+```
+
+```{r}
+a<-Data_Adnexa_BOWEL$meta_program[order(Data_Adnexa_BOWEL$Adnexa_Ucell_Score_median_rank)]
+a<-as.data.frame(a)
+colnames(a)<-"Adnexa_Ucell_Score_median_rank"
+for(i in 10:12){
+b<-Data_Adnexa_BOWEL$meta_program[order(Data_Adnexa_BOWEL[,i])]
+b<-as.data.frame(b)
+colnames(b)<-colnames(Data_Adnexa_BOWEL)[i]
+a<-cbind(a,b)
+}
+
+
+library(gridExtra)
+
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/ranking_Adnexa_BOWEL.pdf", height=20, width=15)
+grid.table(a)
+dev.off()
+
+d<-matrix(data = 0,nrow = 1,ncol = 5)
+d<-as.data.frame(d)
+colnames(d)<-c("number_of_top_metaprograms","number_of_intersection_ADNEXA","Difference_ADNEXA","number_of_intersection_BOWEL","Difference_BOWEL")
+for(i in seq(5,41,5)){
+e<-c(i,length(intersect(a$Adnexa_Ucell_Score_median_rank[1:i],a$Adnexa_scanpy_Score_median_rank[1:i])),paste0(setdiff(a$Adnexa_Ucell_Score_median_rank[1:i],a$Adnexa_scanpy_Score_median_rank[1:i]),collapse = ","),length(intersect(a$BOWEL_Ucell_Score_median_rank[1:i],a$BOWEL_scanpy_Score_median_rank[1:i])),paste0(setdiff(a$BOWEL_Ucell_Score_median_rank[1:i],a$BOWEL_scanpy_Score_median_rank[1:i]),collapse = ","))
+e<-as.data.frame(e)
+e<-t(e)
+colnames(e)<-c("number_of_top_metaprograms","number_of_intersection_ADNEXA","Difference_ADNEXA","number_of_intersection_BOWEL","Difference_BOWEL")
+d<-rbind(d,e)
+}
+
+d<-d[-1,]
+ rownames(d)=NULL
+ 
+pdf("/work/shah/users/Mobina/Projects/SPECTRUM_NACT/Spectrum_Full/intersection_ranking_Adnexa_BOWEL.pdf", height=10, width=30)
+grid.table(d)
+dev.off() 
 ```
 
